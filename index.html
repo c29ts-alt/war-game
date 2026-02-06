@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Mini War Strategy</title>
+<style>
+  body {
+    font-family: sans-serif;
+    background: #111;
+    color: #eee;
+    text-align: center;
+  }
+  #board {
+    display: grid;
+    grid-template-columns: repeat(8, 60px);
+    gap: 4px;
+    margin: 20px auto;
+    width: max-content;
+  }
+  .cell {
+    width: 60px;
+    height: 60px;
+    background: #333;
+    border: 1px solid #555;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  .player { background: #2b6cff; }
+  .enemy { background: #cc3333; }
+  .selected { outline: 3px solid yellow; }
+  #log { max-width: 500px; margin: auto; }
+</style>
+</head>
+<body>
+
+<h1>⚔️ Mini War Strategy</h1>
+<p>Click a blue unit → click target → End Turn</p>
+
+<div id="board"></div>
+<button onclick="endTurn()">End Turn</button>
+
+<p id="log"></p>
+
+<script>
+const SIZE = 8;
+let board = [];
+let selected = null;
+let playerTurn = true;
+
+function init() {
+  board = Array.from({ length: SIZE * SIZE }, () => null);
+
+  // Player units
+  placeUnit(0, 0, "player");
+  placeUnit(1, 0, "player");
+  placeUnit(0, 1, "player");
+
+  // Enemy units
+  placeUnit(7, 7, "enemy");
+  placeUnit(6, 7, "enemy");
+  placeUnit(7, 6, "enemy");
+
+  render();
+}
+
+function placeUnit(x, y, team) {
+  board[y * SIZE + x] = { team, hp: 3 };
+}
+
+function render() {
+  const boardEl = document.getElementById("board");
+  boardEl.innerHTML = "";
+
+  board.forEach((unit, i) => {
+    const cell = document.createElement("div");
+    cell.className = "cell";
+    if (unit) cell.classList.add(unit.team);
+    if (selected === i) cell.classList.add("selected");
+    cell.onclick = () => clickCell(i);
+    boardEl.appendChild(cell);
+  });
+}
+
+function clickCell(i) {
+  if (!playerTurn) return;
+
+  const unit = board[i];
+
+  if (selected === null) {
+    if (unit && unit.team === "player") {
+      selected = i;
+    }
+  } else {
+    if (i !== selected) {
+      handleAction(selected, i);
+    }
+    selected = null;
+  }
+  render();
+}
+
+function handleAction(from, to) {
+  const a = board[from];
+  const b = board[to];
+  if (!a) return;
+
+  if (b && b.team !== a.team) {
+    b.hp--;
+    log("Attack!");
+    if (b.hp <= 0) board[to] = null;
+  } else if (!b) {
+    board[to] = a;
+    board[from] = null;
+  }
+}
+
+function endTurn() {
+  playerTurn = false;
+  aiMove();
+  playerTurn = true;
+  render();
+}
+
+function aiMove() {
+  board.forEach((unit, i) => {
+    if (unit && unit.team === "enemy") {
+      const target = findNearestEnemy(i);
+      if (target !== null) handleAction(i, target);
+    }
+  });
+}
+
+function findNearestEnemy(pos) {
+  const x = pos % SIZE;
+  const y = Math.floor(pos / SIZE);
+
+  const dirs = [
+    [1,0],[-1,0],[0,1],[0,-1]
+  ];
+
+  for (const [dx,dy] of dirs) {
+    const nx = x + dx, ny = y + dy;
+    if (nx >= 0 && ny >= 0 && nx < SIZE && ny < SIZE) {
+      const i = ny * SIZE + nx;
+      if (!board[i] || board[i].team === "player") return i;
+    }
+  }
+  return null;
+}
+
+function log(msg) {
+  document.getElementById("log").textContent = msg;
+}
+
+init();
+</script>
+
+</body>
+</html>
