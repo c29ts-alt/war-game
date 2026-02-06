@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>War Campaign Strategy</title>
+<style>
+body {
+  background:#0e0e0e;
+  color:#eee;
+  font-family: Arial;
+  text-align:center;
+}
+#top {
+  display:flex;
+  justify-content:space-around;
+  padding:10px;
+  background:#222;
+}
+#map {
+  display:grid;
+  grid-template-columns: repeat(10, 60px);
+  gap:4px;
+  margin:20px auto;
+  width:max-content;
+}
+.cell {
+  width:60px;
+  height:60px;
+  background:#333;
+  border:1px solid #555;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:12px;
+}
+.player { background:#2b6cff; }
+.enemy { background:#cc3333; }
+.factory { outline:3px solid gold; }
+.selected { outline:3px solid yellow; }
+</style>
+</head>
+<body>
+
+<h1>⚔️ War Campaign</h1>
+
+<div id="top">
+  <div>Materials: <span id="materials">100</span></div>
+  <button onclick="endTurn()">End Turn</button>
+</div>
+
+<div id="map"></div>
+<p id="log"></p>
+
+<script>
+const SIZE = 10;
+let materials = 100;
+let selected = null;
+let playerTurn = true;
+
+const unitTypes = {
+  infantry: { hp:3, dmg:1, speed:2, cost:10 },
+  lightTank: { hp:5, dmg:2, speed:3, cost:25 },
+  mediumTank: { hp:7, dmg:3, speed:2, cost:40 },
+  heavyTank: { hp:10, dmg:4, speed:1, cost:70 },
+  antiTank: { hp:3, dmg:4, speed:1, cost:30 }
+};
+
+let map = [];
+
+function init() {
+  map = Array.from({length: SIZE*SIZE}, () => null);
+
+  placeUnit(1,1,"player","infantry");
+  placeUnit(2,1,"player","lightTank");
+
+  placeUnit(8,8,"enemy","mediumTank");
+  placeUnit(7,8,"enemy","infantry");
+
+  placeFactory(0,0,"player");
+  placeFactory(9,9,"enemy");
+
+  render();
+}
+
+function placeUnit(x,y,team,type){
+  map[y*SIZE+x] = { team, type, hp: unitTypes[type].hp };
+}
+
+function placeFactory(x,y,team){
+  map[y*SIZE+x] = { team, factory:true };
+}
+
+function render(){
+  const el = document.getElementById("map");
+  el.innerHTML = "";
+
+  map.forEach((cell,i)=>{
+    const d = document.createElement("div");
+    d.className = "cell";
+    if(cell){
+      d.classList.add(cell.team);
+      if(cell.factory) d.classList.add("factory");
+      if(cell.type) d.textContent = cell.type[0].toUpperCase();
+    }
+    if(selected === i) d.classList.add("selected");
+    d.onclick = ()=>clickCell(i);
+    el.appendChild(d);
+  });
+
+  document.getElementById("materials").textContent = materials;
+}
+
+function clickCell(i){
+  if(!playerTurn) return;
+  const cell = map[i];
+
+  if(selected === null){
+    if(cell && cell.team==="player") selected = i;
+  } else {
+    handleAction(selected,i);
+    selected = null;
+  }
+  render();
+}
+
+function handleAction(from,to){
+  const a = map[from];
+  const b = map[to];
+  if(!a) return;
+
+  if(a.factory && !b && materials>=10){
+    placeUnit(to%SIZE, Math.floor(to/SIZE), "player","infantry");
+    materials -= 10;
+    log("Produced Infantry");
+    return;
+  }
+
+  if(b && b.team !== a.team && a.type){
+    let dmg = unitTypes[a.type].dmg;
+
+    if(a.type==="antiTank" && b.type?.includes("Tank")) dmg *= 2;
+    if(a.type.includes("Tank") && b.type==="infantry") dmg *= 0.5;
+
+    b.hp -= dmg;
+    log(`${a.type} attacks ${b.type}`);
+
+    if(b.hp <= 0){
+      map[to] = null;
+      materials += 5;
+    }
+  } else if(!b && a.type){
+    map[to] = a;
+    map[from] = null;
+  }
+}
+
+function endTurn(){
+  playerTurn = false;
+  aiTurn();
+  materials += countFactories("player") * 5;
+  playerTurn = true;
+  render();
+}
+
+function aiTurn(){
+  map.forEach((cell,i)=>{
+    if(cell && cell.team==="enemy" && cell.type){
+      const target = findTarget(i);
+      if(target !== null) handleAction(i,target);
+    }
+  });
+}
+
+function findTarget(pos){
+  const x = pos%SIZE;
+  const y = Math.floor(pos/SIZE);
+  const dirs=[[1,0],[-1,0],[0,1],[0,-1]];
+  for(const [dx,dy] of dirs){
+    const nx=x+dx, ny=y+dy;
+    if(nx>=0&&ny>=0&&nx<SIZE&&ny<SIZE){
+      return ny*SIZE+nx;
+    }
+  }
+  return null;
+}
+
+function countFactories(team){
+  return map.filter(c=>c?.factory && c.team===team).length;
+}
+
+function log(msg){
+  document.getElementById("log").textContent = msg;
+}
+
+init();
+</script>
+
+</body>
+</html>
